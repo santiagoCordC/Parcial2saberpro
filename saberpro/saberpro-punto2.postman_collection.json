@@ -1,0 +1,195 @@
+{
+  "info": {
+    "name": "SaberPRO - Punto 2 (REST + RabbitMQ)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Validation Service - POST /validate (válida)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8082/validate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"statement\": \"¿Cuál es la capital de Colombia?\",\n  \"justification\": \"Bogotá es la capital según la Constitución de 1991.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 y valid=true', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().valid).to.eql(true); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Crear pregunta válida -> 201 Created (DRAFT)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8083/questions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"statement\": \"¿Cuál es la capital de Colombia?\",\n  \"justification\": \"Bogotá es la capital según la Constitución de 1991.\",\n  \"options\": [\n    {\n      \"text\": \"Medellín\",\n      \"correct\": false\n    },\n    {\n      \"text\": \"Bogotá\",\n      \"correct\": true\n    },\n    {\n      \"text\": \"Cali\",\n      \"correct\": false\n    },\n    {\n      \"text\": \"Popayán\",\n      \"correct\": false\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));",
+              "pm.test('Estado DRAFT', () => pm.expect(pm.response.json().status).to.eql('DRAFT'));",
+              "pm.collectionVariables.set('questionId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Crear pregunta con justificación corta -> 400",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8083/questions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"statement\": \"¿Cuál es la capital de Colombia?\",\n  \"justification\": \"Porque sí\",\n  \"options\": [\n    {\n      \"text\": \"Medellín\",\n      \"correct\": false\n    },\n    {\n      \"text\": \"Bogotá\",\n      \"correct\": true\n    },\n    {\n      \"text\": \"Cali\",\n      \"correct\": false\n    },\n    {\n      \"text\": \"Popayán\",\n      \"correct\": false\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Crear pregunta con 3 opciones (Builder) -> 400",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "http://localhost:8083/questions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"statement\": \"¿Cuál es la capital de Colombia?\",\n  \"justification\": \"Bogotá es la capital según la Constitución de 1991.\",\n  \"options\": [\n    {\n      \"text\": \"Medellín\",\n      \"correct\": false\n    },\n    {\n      \"text\": \"Bogotá\",\n      \"correct\": true\n    },\n    {\n      \"text\": \"Cali\",\n      \"correct\": false\n    }\n  ]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('400 Bad Request', () => pm.response.to.have.status(400));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Listar preguntas",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "http://localhost:8083/questions"
+      }
+    },
+    {
+      "name": "6. Enviar a revisión -> 202 Accepted (RabbitMQ)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "http://localhost:8083/questions/{{questionId}}/submit"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+              "pm.test('Tiene operationId', () => pm.expect(pm.response.json().operationId).to.be.a('string'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Lifecycle Service - estado tras consumir el mensaje",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "http://localhost:8084/lifecycle/questions/{{questionId}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('PENDING_REVIEW', () => pm.expect(pm.response.json().status).to.eql('PENDING_REVIEW'));"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "questionId",
+      "value": "1"
+    }
+  ]
+}
